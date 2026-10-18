@@ -126,12 +126,19 @@
                     <p id="bottomSubText" class="text-xs text-lime-800 text-center mt-2 italic min-h-[1rem]"></p>
                 </div>
 
-                <!-- Mic Action Controls -->
+                <!-- Mic Action Controls (Push to Talk) -->
                 <div class="flex justify-around items-center pt-1 pb-2">
-                    <!-- Top Speaker Speech Recognition Button -->
-                    <button id="topMicBtn" onclick="toggleSpeech('top')" class="w-16 h-16 rounded-full bg-sky-500 text-white flex flex-col items-center justify-center shadow-lg active:scale-90 transition hover:bg-sky-600 relative">
+                    <!-- Top Speaker Speech Recognition Button (Push to Talk) -->
+                    <button id="topMicBtn" 
+                            onmousedown="startPushToTalk('top', event)" 
+                            onmouseup="stopPushToTalk('top', event)" 
+                            mouseleave="stopPushToTalk('top', event)"
+                            ontouchstart="startPushToTalk('top', event)" 
+                            ontouchend="stopPushToTalk('top', event)"
+                            ontouchcancel="stopPushToTalk('top', event)"
+                            class="w-16 h-16 rounded-full bg-sky-500 text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition hover:bg-sky-600 relative select-none touch-none cursor-pointer">
                         <i id="topMicIcon" class="fa-solid fa-microphone text-2xl"></i>
-                        <span id="topMicLabel" class="text-[10px] font-bold mt-0.5">상대방</span>
+                        <span id="topMicLabel" class="text-[10px] font-bold mt-0.5 pointer-events-none">누르고 말하기</span>
                     </button>
 
                     <!-- Status Text Badge -->
@@ -140,10 +147,17 @@
                         <span id="listeningText">듣는 중...</span>
                     </div>
 
-                    <!-- Bottom Speaker Speech Recognition Button -->
-                    <button id="bottomMicBtn" onclick="toggleSpeech('bottom')" class="w-16 h-16 rounded-full bg-lime-600 text-white flex flex-col items-center justify-center shadow-lg active:scale-90 transition hover:bg-lime-700 relative">
+                    <!-- Bottom Speaker Speech Recognition Button (Push to Talk) -->
+                    <button id="bottomMicBtn" 
+                            onmousedown="startPushToTalk('bottom', event)" 
+                            onmouseup="stopPushToTalk('bottom', event)" 
+                            mouseleave="stopPushToTalk('bottom', event)"
+                            ontouchstart="startPushToTalk('bottom', event)" 
+                            ontouchend="stopPushToTalk('bottom', event)"
+                            ontouchcancel="stopPushToTalk('bottom', event)"
+                            class="w-16 h-16 rounded-full bg-lime-600 text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition hover:bg-lime-700 relative select-none touch-none cursor-pointer">
                         <i id="bottomMicIcon" class="fa-solid fa-microphone text-2xl"></i>
-                        <span id="bottomMicLabel" class="text-[10px] font-bold mt-0.5">나</span>
+                        <span id="bottomMicLabel" class="text-[10px] font-bold mt-0.5 pointer-events-none">누르고 말하기</span>
                     </button>
                 </div>
             </div>
@@ -206,7 +220,7 @@
             initSpeechRecognition();
         };
 
-        // Initialize Native Browser Speech Recognition
+        // Initialize Native Browser Speech Recognition for Push-To-Talk
         function initSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
@@ -215,8 +229,7 @@
             }
 
             recognition = new SpeechRecognition();
-            // continuous: false 사용 (모바일 브라우저 락 현상 방지용 Auto-Restart Loop 적용)
-            recognition.continuous = false;
+            recognition.continuous = true;
             recognition.interimResults = true;
 
             recognition.onstart = () => {
@@ -232,8 +245,6 @@
                 if (currentText.trim()) {
                     const targetElId = (activeSide === 'top') ? 'topText' : 'bottomText';
                     const targetEl = document.getElementById(targetElId);
-
-                    // 받아적은 텍스트 화면에 즉시 갱신
                     targetEl.textContent = currentText;
                     fullRecognizedText = currentText;
                 }
@@ -242,107 +253,87 @@
             recognition.onerror = (event) => {
                 console.error("Speech Recognition Error:", event.error);
                 if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                    showToast("마이크 권한이 거부되었거나 지원되지 않습니다.");
-                    stopSpeech();
-                } else if (event.error === 'no-speech') {
-                    // 무음 상태는 마이크가 켜져 있는 동안 계속 유지
+                    showToast("마이크 권한이 거부되었습니다.");
                 }
             };
 
             recognition.onend = () => {
-                // 사용자가 마이크 버튼을 눌러 끄기 전까지 계속 자동 시작(Auto-Restart Loop)
-                if (isListening) {
-                    try {
-                        recognition.start();
-                    } catch(e) {
-                        setTimeout(() => {
-                            if (isListening) recognition.start();
-                        }, 200);
-                    }
-                } else {
-                    updateMicUI(false);
-                    // 마이크를 껐을 때 받아적은 결과가 있으면 상대방 언어로 번역
-                    if (fullRecognizedText.trim()) {
-                        translateFinalResult(fullRecognizedText.trim(), activeSide);
-                    }
+                updateMicUI(false);
+                if (fullRecognizedText.trim() && activeSide) {
+                    translateFinalResult(fullRecognizedText.trim(), activeSide);
                 }
             };
         }
 
-        async function toggleSpeech(side) {
-            // 1. 사용자 액션 시점에 마이크 사용권한 요청 및 체크
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    // 권한 획득 즉시 스트림 정지 (SpeechRecognition 마이크 장치 점유 충돌 방지)
-                    stream.getTracks().forEach(track => track.stop());
-                } catch (err) {
-                    console.error("Microphone permission error:", err);
-                    showToast("마이크 접근 권한을 허용해 주세요 (HTTPS 환경 필요).");
-                    return;
-                }
+        // Push to Talk: Touch Start / Mouse Down
+        async function startPushToTalk(side, event) {
+            if (event) {
+                event.preventDefault();
             }
+
+            if (isListening) return;
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                showToast("현재 브라우저는 음성 인식을 지원하지 않습니다. (Chrome/Safari 추천)");
+                showToast("현재 브라우저는 음성 인식을 지원하지 않습니다.");
                 return;
+            }
+
+            // Request mic permission on user gesture
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(track => track.stop());
+                } catch (err) {
+                    showToast("마이크 접근 권한을 허용해 주세요.");
+                    return;
+                }
             }
 
             if (!recognition) {
                 initSpeechRecognition();
             }
 
-            if (isListening && activeSide === side) {
-                // 같은 마이크 버튼 클릭 시 음성 인식 중지 & 번역
-                stopSpeech();
+            activeSide = side;
+            fullRecognizedText = '';
+            isListening = true;
+
+            const langCode = (side === 'top') 
+                ? document.getElementById('topLangSelect').value 
+                : document.getElementById('bottomLangSelect').value;
+
+            recognition.lang = langCode;
+
+            if (side === 'top') {
+                document.getElementById('topText').textContent = "말씀하시는 동안 버튼을 누르고 계세요...";
             } else {
-                // 이전 진행 중인 인식 정지
-                if (isListening) {
-                    isListening = false;
-                    try { recognition.stop(); } catch(e){}
-                }
+                document.getElementById('bottomText').textContent = "말씀하시는 동안 버튼을 누르고 계세요...";
+            }
 
-                activeSide = side;
-                fullRecognizedText = '';
-
-                const langCode = (side === 'top') 
-                    ? document.getElementById('topLangSelect').value 
-                    : document.getElementById('bottomLangSelect').value;
-
-                recognition.lang = langCode;
-
-                // 화면 텍스트 초기화
-                if (side === 'top') {
-                    document.getElementById('topText').textContent = "듣는 중... 말씀해 주세요.";
-                } else {
-                    document.getElementById('bottomText').textContent = "듣는 중... 말씀해 주세요.";
-                }
-
-                isListening = true;
-                try {
-                    recognition.start();
-                } catch (e) {
-                    console.error("Start error:", e);
-                    try {
-                        recognition.stop();
-                        setTimeout(() => {
-                            if (isListening) recognition.start();
-                        }, 250);
-                    } catch (retryErr) {
-                        isListening = false;
-                        showToast("음성 인식을 시작할 수 없습니다.");
-                    }
-                }
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error("Push-To-Talk Start Error:", e);
+                isListening = false;
+                updateMicUI(false);
             }
         }
 
-        function stopSpeech() {
+        // Push to Talk: Touch End / Mouse Up / Leave
+        function stopPushToTalk(side, event) {
+            if (event) {
+                event.preventDefault();
+            }
+
+            if (!isListening || activeSide !== side) return;
+
             isListening = false;
             if (recognition) {
                 try {
                     recognition.stop();
-                } catch(e) {}
+                } catch (e) {
+                    console.error("Push-To-Talk Stop Error:", e);
+                }
             }
             updateMicUI(false);
         }
@@ -355,16 +346,16 @@
             if (listening) {
                 badge.classList.remove('hidden');
                 if (activeSide === 'top') {
-                    topBtn.classList.add('ring-4', 'ring-red-400', 'bg-red-500', 'animate-pulse');
+                    topBtn.classList.add('ring-4', 'ring-red-400', 'bg-red-500', 'scale-105');
                     bottomBtn.classList.add('opacity-50');
                 } else {
-                    bottomBtn.classList.add('ring-4', 'ring-red-400', 'bg-red-500', 'animate-pulse');
+                    bottomBtn.classList.add('ring-4', 'ring-red-400', 'bg-red-500', 'scale-105');
                     topBtn.classList.add('opacity-50');
                 }
             } else {
                 badge.classList.add('hidden');
-                topBtn.classList.remove('ring-4', 'ring-red-400', 'bg-red-500', 'animate-pulse', 'opacity-50');
-                bottomBtn.classList.remove('ring-4', 'ring-red-400', 'bg-red-500', 'animate-pulse', 'opacity-50');
+                topBtn.classList.remove('ring-4', 'ring-red-400', 'bg-red-500', 'scale-105', 'opacity-50');
+                bottomBtn.classList.remove('ring-4', 'ring-red-400', 'bg-red-500', 'scale-105', 'opacity-50');
             }
         }
 
