@@ -35,7 +35,7 @@
     <!-- Smartphone Frame Container -->
     <div class="w-full max-w-md h-[100vh] sm:h-[840px] bg-black sm:rounded-[45px] shadow-2xl overflow-hidden flex flex-col relative border-[6px] border-slate-800">
         
-        <!-- Phone Camera Notch / Dynamic Island -->
+        <!-- Phone Camera Notch -->
         <div class="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-4 bg-black rounded-full z-50 hidden sm:block"></div>
 
         <!-- APP CONTENT AREA -->
@@ -82,6 +82,7 @@
                     <option value="fr-FR">🇫🇷 프랑스어</option>
                     <option value="de-DE">🇩🇪 독일어</option>
                     <option value="vi-VN">🇻🇳 베트남어</option>
+                    <option value="ko-KR">🇰🇷 한국어</option>
                 </select>
 
                 <!-- Language Swap Button -->
@@ -95,6 +96,7 @@
                     <option value="ja-JP">🇯🇵 일본어</option>
                     <option value="en-US">🇺🇸 영어</option>
                     <option value="zh-CN">🇨🇳 중국어</option>
+                    <option value="es-ES">🇪🇸 스페인어</option>
                 </select>
             </div>
 
@@ -132,10 +134,10 @@
                         <span id="topMicLabel" class="text-[10px] font-bold mt-0.5">상대방</span>
                     </button>
 
-                    <!-- Status Text -->
+                    <!-- Status Text Badge -->
                     <div id="listeningBadge" class="hidden flex items-center space-x-1.5 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold animate-pulse shadow-md">
                         <i class="fa-solid fa-circle text-[8px]"></i>
-                        <span id="listeningText">실시간 듣는 중...</span>
+                        <span id="listeningText">듣는 중...</span>
                     </div>
 
                     <!-- Bottom Speaker Speech Recognition Button -->
@@ -166,7 +168,7 @@
         </div>
     </div>
 
-    <!-- Alert / Toast Modal -->
+    <!-- Toast Modal -->
     <div id="toastModal" class="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-4 py-2 rounded-full text-xs z-50 shadow-lg hidden transition-opacity duration-300">
         <span id="toastMsg">알림 메시지</span>
     </div>
@@ -188,8 +190,7 @@
         let recognition = null;
         let isListening = false;
         let activeSide = null; // 'top' or 'bottom'
-        let interimTranscript = '';
-        let finalTranscript = '';
+        let fullRecognizedText = '';
 
         function showToast(msg) {
             const toast = document.getElementById('toastModal');
@@ -214,38 +215,27 @@
             }
 
             recognition = new SpeechRecognition();
-            recognition.continuous = true; // 계속 들음
-            recognition.interimResults = true; // 말하는 동안 실시간 받아적기
+            // continuous: false 사용 (모바일 브라우저 락 현상 방지용 Auto-Restart Loop 적용)
+            recognition.continuous = false;
+            recognition.interimResults = true;
 
             recognition.onstart = () => {
-                isListening = true;
                 updateMicUI(true);
             };
 
             recognition.onresult = (event) => {
-                let currentInterim = '';
-                let currentFinal = '';
-
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        currentFinal += event.results[i][0].transcript;
-                    } else {
-                        currentInterim += event.results[i][0].transcript;
-                    }
+                let currentText = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    currentText += event.results[i][0].transcript;
                 }
 
-                if (currentFinal) {
-                    finalTranscript += currentFinal + ' ';
-                }
+                if (currentText.trim()) {
+                    const targetElId = (activeSide === 'top') ? 'topText' : 'bottomText';
+                    const targetEl = document.getElementById(targetElId);
 
-                const liveText = finalTranscript + currentInterim;
-
-                if (liveText.trim().length > 0) {
-                    if (activeSide === 'top') {
-                        document.getElementById('topText').textContent = liveText;
-                    } else if (activeSide === 'bottom') {
-                        document.getElementById('bottomText').textContent = liveText;
-                    }
+                    // 받아적은 텍스트 화면에 즉시 갱신
+                    targetEl.textContent = currentText;
+                    fullRecognizedText = currentText;
                 }
             };
 
@@ -253,38 +243,38 @@
                 console.error("Speech Recognition Error:", event.error);
                 if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                     showToast("마이크 권한이 거부되었거나 지원되지 않습니다.");
+                    stopSpeech();
                 } else if (event.error === 'no-speech') {
-                    showToast("음성이 감지되지 않았습니다.");
-                } else {
-                    showToast("음성 인식 오류: " + event.error);
+                    // 무음 상태는 마이크가 켜져 있는 동안 계속 유지
                 }
-                stopSpeech();
             };
 
             recognition.onend = () => {
+                // 사용자가 마이크 버튼을 눌러 끄기 전까지 계속 자동 시작(Auto-Restart Loop)
                 if (isListening) {
                     try {
                         recognition.start();
                     } catch(e) {
-                        stopSpeech();
+                        setTimeout(() => {
+                            if (isListening) recognition.start();
+                        }, 200);
                     }
                 } else {
                     updateMicUI(false);
-                    // 마이크 껐을 때 최종 문장 번역 실행
-                    if (finalTranscript.trim()) {
-                        translateFinalResult(finalTranscript.trim(), activeSide);
+                    // 마이크를 껐을 때 받아적은 결과가 있으면 상대방 언어로 번역
+                    if (fullRecognizedText.trim()) {
+                        translateFinalResult(fullRecognizedText.trim(), activeSide);
                     }
                 }
             };
         }
 
-        // Toggle Speech Recognition On/Off
         async function toggleSpeech(side) {
-            // 사용자 액션 시점에 마이크 권한 명시적 요청
+            // 1. 사용자 액션 시점에 마이크 사용권한 요청 및 체크
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    // 권한 획득 성공 후 즉시 트랙 정지 (SpeechRecognition이 독립적으로 사용하게 함)
+                    // 권한 획득 즉시 스트림 정지 (SpeechRecognition 마이크 장치 점유 충돌 방지)
                     stream.getTracks().forEach(track => track.stop());
                 } catch (err) {
                     console.error("Microphone permission error:", err);
@@ -304,41 +294,40 @@
             }
 
             if (isListening && activeSide === side) {
-                // 같은 버튼 누르면 중지
+                // 같은 마이크 버튼 클릭 시 음성 인식 중지 & 번역
                 stopSpeech();
             } else {
-                // 기존 진행 중인 인식 종료
+                // 이전 진행 중인 인식 정지
                 if (isListening) {
-                    stopSpeech();
+                    isListening = false;
+                    try { recognition.stop(); } catch(e){}
                 }
 
                 activeSide = side;
-                finalTranscript = '';
-                interimTranscript = '';
+                fullRecognizedText = '';
 
-                const langCode = side === 'top' 
+                const langCode = (side === 'top') 
                     ? document.getElementById('topLangSelect').value 
                     : document.getElementById('bottomLangSelect').value;
 
                 recognition.lang = langCode;
 
-                // 화면 초기화 및 상태 표시
+                // 화면 텍스트 초기화
                 if (side === 'top') {
                     document.getElementById('topText').textContent = "듣는 중... 말씀해 주세요.";
                 } else {
                     document.getElementById('bottomText').textContent = "듣는 중... 말씀해 주세요.";
                 }
 
+                isListening = true;
                 try {
-                    isListening = true;
                     recognition.start();
                 } catch (e) {
                     console.error("Start error:", e);
                     try {
                         recognition.stop();
                         setTimeout(() => {
-                            isListening = true;
-                            recognition.start();
+                            if (isListening) recognition.start();
                         }, 250);
                     } catch (retryErr) {
                         isListening = false;
@@ -379,7 +368,6 @@
             }
         }
 
-        // Final Translation with Gemini API
         async function translateFinalResult(text, side) {
             const topLang = document.getElementById('topLangSelect').value;
             const bottomLang = document.getElementById('bottomLangSelect').value;
@@ -437,7 +425,7 @@
             const text = customText || (side === 'top' ? document.getElementById('topText').textContent : document.getElementById('bottomText').textContent);
             const lang = customLang || (side === 'top' ? document.getElementById('topLangSelect').value : document.getElementById('bottomLangSelect').value);
 
-            if (!text || text.includes("번역 중...")) return;
+            if (!text || text.includes("번역 중...") || text.includes("듣는 중...")) return;
 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
@@ -445,7 +433,6 @@
             window.speechSynthesis.speak(utterance);
         }
 
-        // UI Language Updates
         function onLanguageChange() {
             const topCode = document.getElementById('topLangSelect').value;
             const bottomCode = document.getElementById('bottomLangSelect').value;
@@ -457,7 +444,6 @@
             document.getElementById('bottomLangLabel').textContent = LANG_MAP[bottomCode].name;
         }
 
-        // Swap Languages
         function swapLanguages() {
             const topSelect = document.getElementById('topLangSelect');
             const bottomSelect = document.getElementById('bottomLangSelect');
