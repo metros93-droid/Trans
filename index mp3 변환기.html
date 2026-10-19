@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MP3변환 Pro">
+    <meta name="application-name" content="MP3변환 Pro">
+    <meta name="theme-color" content="#1a1210">
+    <title>Audio to MP3 변환기 Pro (다중 파일 일괄 변환)</title>
+
+    <!-- PWA Web Manifest Link -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- 모바일 및 브라우저 탭 / 홈 화면 추가 전용 아이콘 (SVG Data URI) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231a100c'/%3E%3Cstop offset='50%25' stop-color='%2338241b'/%3E%3Cstop offset='100%25' stop-color='%238c582d'/%3E%3C/linearGradient%3E%3ClinearGradient id='gold' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ffe8d6'/%3E%3Cstop offset='100%25' stop-color='%23d9b48f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='28' fill='url(%23bg)'/%3E%3Ccircle cx='50' cy='50' r='42' fill='none' stroke='url(%23gold)' stroke-width='2' stroke-opacity='0.25'/%3E%3Ctext x='50' y='43' fill='url(%23gold)' font-family='system-ui, -apple-system, sans-serif' font-weight='900' font-size='26' text-anchor='middle'%3EMP3%3C/text%3E%3Crect x='26' y='52' width='48' height='20' rx='10' fill='url(%23gold)'/%3E%3Ctext x='50' y='66.5' fill='%23160d0b' font-family='system-ui, -apple-system, sans-serif' font-weight='900' font-size='13' text-anchor='middle' letter-spacing='1'%3EPRO%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231a100c'/%3E%3Cstop offset='50%25' stop-color='%2338241b'/%3E%3Cstop offset='100%25' stop-color='%238c582d'/%3E%3C/linearGradient%3E%3ClinearGradient id='gold' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ffe8d6'/%3E%3Cstop offset='100%25' stop-color='%23d9b48f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='28' fill='url(%23bg)'/%3E%3Ccircle cx='50' cy='50' r='42' fill='none' stroke='url(%23gold)' stroke-width='2' stroke-opacity='0.25'/%3E%3Ctext x='50' y='43' fill='url(%23gold)' font-family='system-ui, -apple-system, sans-serif' font-weight='900' font-size='26' text-anchor='middle'%3EMP3%3C/text%3E%3Crect x='26' y='52' width='48' height='20' rx='10' fill='url(%23gold)'/%3E%3Ctext x='50' y='66.5' fill='%23160d0b' font-family='system-ui, -apple-system, sans-serif' font-weight='900' font-size='13' text-anchor='middle' letter-spacing='1'%3EPRO%3C/text%3E%3C/svg%3E">
+
+    <!-- Tailwind CSS 및 외부 라이브러리 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- MP3 인코딩용 lamejs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+    <!-- 곡 메타데이터(태그/앨범아트) 읽기용 jsmediatags -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <!-- MP3 ID3 태그 기록용 browser-id3-writer -->
+    <script src="https://cdn.jsdelivr.net/npm/browser-id3-writer@4.4.0/build/browser-id3-writer.min.js"></script>
+    <!-- 다중 파일 ZIP 압축 다운로드용 JSZip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: radial-gradient(circle at top, #2b1f1d 0%, #1a1210 60%, #0d0807 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            color: #f3e8dc;
+        }
+        .glass-panel {
+            background: rgba(26, 18, 15, 0.90);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(217, 180, 143, 0.15);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 20px rgba(217, 180, 143, 0.08);
+        }
+        .glass-card {
+            background: rgba(41, 28, 23, 0.7);
+            border: 1px solid rgba(217, 180, 143, 0.10);
+        }
+        .drag-active {
+            border-color: #d9b48f !important;
+            background: rgba(217, 180, 143, 0.15) !important;
+        }
+        
+        /* 커스텀 슬라이더 스타일 */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #d9b48f;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(217, 180, 143, 0.6);
+            transition: transform 0.15s, background-color 0.2s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #f3e8dc;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #422e26;
+            border-radius: 2px;
+        }
+
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(26, 18, 15, 0.6);
+            border-radius: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #593f34;
+            border-radius: 6px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #785748;
+        }
+    </style>
+</head>
+<body class="p-2 sm:p-4">
+
+    <div class="glass-panel w-full max-w-xl rounded-2xl p-3.5 sm:p-5 text-stone-100 transition-all my-auto">
+        <!-- 헤더 영역 -->
+        <div class="flex items-center justify-between border-b border-[#38261e] pb-2.5 mb-3">
+            <div class="flex items-center gap-2.5">
+                <!-- 커스텀 로고 SVG 뱃지 -->
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#8c582d] via-[#38241b] to-[#1a100c] p-0.5 border border-[#d9b48f]/30 flex items-center justify-center shadow-md shadow-[#0d0807]">
+                    <svg viewBox="0 0 100 100" class="w-full h-full">
+                        <text x="50" y="43" fill="#d9b48f" font-family="system-ui, sans-serif" font-weight="900" font-size="26" text-anchor="middle">MP3</text>
+                        <rect x="26" y="52" width="48" height="20" rx="10" fill="#d9b48f"/>
+                        <text x="50" y="66.5" fill="#160d0b" font-family="system-ui, sans-serif" font-weight="900" font-size="13" text-anchor="middle" letter-spacing="1">PRO</text>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-black tracking-tight text-[#f3e8dc]">MP3 변환기 <span class="text-[#d9b48f]">Pro</span></h1>
+                </div>
+            </div>
+        </div>
+
+        <!-- 파일 드롭 / 선택 영역 -->
+        <div id="drop-zone" class="border-2 border-dashed border-[#473229] hover:border-[#d9b48f]/80 rounded-xl p-3.5 sm:p-4 transition-all duration-200 cursor-pointer bg-[#160d0b]/60 hover:bg-[#261814]/70 flex items-center justify-center gap-3 text-center group">
+            <div class="w-9 h-9 rounded-full bg-[#d9b48f]/10 text-[#d9b48f] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+                <i class="fa-solid fa-cloud-arrow-up text-lg" id="file-icon"></i>
+            </div>
+            <div class="text-left">
+                <p class="text-[#f3e8dc] font-bold text-xs sm:text-sm">오디오 파일 드래그 또는 클릭하여 선택</p>
+                <p class="text-[11px] text-stone-400">다중 선택 지원 (.ogg, .opus, .m4a, .wav, .aac, .flac 등)</p>
+            </div>
+            <input type="file" id="file-input" accept="audio/*,.ogg,.opus,.m4a,.wav,.aac,.flac" multiple class="hidden">
+        </div>
+
+        <!-- 일괄 설정 옵션 영역 -->
+        <div id="global-options" class="mt-3 flex flex-col gap-2.5 glass-card p-3 sm:p-4 rounded-xl text-left">
+            <div class="flex items-center justify-between font-bold text-xs text-stone-300 pb-1.5 border-b border-[#38261e]">
+                <span><i class="fa-solid fa-sliders text-[#d9b48f] mr-1.5"></i> 변환 & 음량 설정</span>
+                <span id="file-count-badge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#1c120f] text-stone-300 border border-[#38261e]">파일 0개</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <!-- 목표 평균 음량 (Target dBFS) 설정 (-15 ~ -11 범위, 0.1 단위 스텝) -->
+                <div class="bg-[#1a110e]/90 p-2.5 rounded-lg border border-[#38261e]">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label for="target-db-slider" class="text-[11px] font-bold text-stone-300"><i class="fa-solid fa-wand-magic-sparkles text-[#d9b48f] mr-1"></i>목표 평균 음량</label>
+                        <span id="target-db-text" class="text-[11px] font-extrabold text-[#f3e8dc] bg-[#3d271d] px-1.5 py-0.5 rounded border border-[#634233]">-12.0 dBFS</span>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <input type="range" id="target-db-slider" min="-15.0" max="-11.0" step="0.1" value="-12.0" class="w-full transition-opacity">
+                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="음량 조절 On/Off">
+                            <input type="checkbox" id="volume-toggle" class="sr-only peer">
+                            <div class="w-8 h-4 bg-stone-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-600 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#c99a6e]"></div>
+                        </label>
+                    </div>
+                    <div class="flex justify-between text-[9px] text-stone-400 mt-0.5 font-medium pr-10">
+                        <span>-15 dB (작게)</span>
+                        <span>-13 dB (표준)</span>
+                        <span>-11 dB (최대)</span>
+                    </div>
+                </div>
+
+                <!-- MP3 음질 선택 -->
+                <div class="bg-[#1a110e]/90 p-2.5 rounded-lg border border-[#38261e] flex flex-col justify-between">
+                    <label for="bitrate-select" class="text-[11px] font-bold text-stone-300 mb-1"><i class="fa-solid fa-compact-disc text-[#d9b48f] mr-1"></i> MP3 음질 선택</label>
+                    <select id="bitrate-select" class="bg-[#120a08] border border-[#38261e] text-[#f3e8dc] text-xs rounded-lg focus:ring-[#d9b48f] focus:border-[#d9b48f] block w-full p-1.5 outline-none cursor-pointer font-medium">
+                        <option value="128">128 kbps (표준 용량 절약)</option>
+                        <option value="192">192 kbps (고음질)</option>
+                        <option value="256">256 kbps (초고음질)</option>
+                        <option value="320" selected>320 kbps (최고 음질 - 추천)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 클리핑 경고 -->
+            <p id="clipping-warning" class="text-[11px] text-rose-400 font-medium hidden flex items-center gap-1.5">
+                <i class="fa-solid fa-triangle-exclamation"></i> 주의: 일부 음원에서 소리가 깨질 수 있습니다.
+            </p>
+        </div>
+
+        <!-- 업로드된 파일 목록 영역 -->
+        <div id="file-list-container" class="mt-3 hidden">
+            <div class="flex justify-between items-center mb-1.5 px-1">
+                <span class="text-[11px] font-bold text-stone-400 uppercase tracking-wider">변환 목록</span>
+                <button id="clear-all-btn" class="text-[11px] text-stone-400 hover:text-rose-400 font-medium transition-colors">
+                    <i class="fa-solid fa-trash-can mr-1"></i>전체 삭제
+                </button>
+            </div>
+            
+            <div id="file-list" class="max-h-48 sm:max-h-56 overflow-y-auto flex flex-col gap-2 pr-1">
+                <!-- 동적 파일 항목 -->
+            </div>
+        </div>
+
+        <!-- 변환 및 다운로드 액션 버튼 영역 -->
+        <div id="action-area" class="mt-3">
+            <button id="convert-btn" disabled class="w-full bg-gradient-to-r from-[#b58253] to-[#8c582d] hover:from-[#c99a6e] hover:to-[#a06937] disabled:opacity-40 disabled:cursor-not-allowed text-[#120a08] font-black py-2.5 px-5 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-md shadow-[#0d0807]/40 flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-bolt"></i> <span id="convert-btn-text">파일을 추가해 주세요</span>
+            </button>
+
+            <!-- 전체 진행률 바 -->
+            <div id="progress-container" class="mt-3 hidden glass-card p-3 rounded-xl">
+                <div class="flex justify-between text-xs font-bold text-stone-300 mb-1">
+                    <span id="progress-status"><i class="fa-solid fa-spinner fa-spin text-[#d9b48f] mr-1"></i>일괄 변환 처리 중...</span>
+                    <span id="progress-text" class="text-[#d9b48f] font-mono">0%</span>
+                </div>
+                <div class="w-full bg-[#120a08] rounded-full h-2.5 p-0.5 border border-[#38261e]">
+                    <div id="progress-bar" class="bg-gradient-to-r from-[#d9b48f] to-[#b58253] h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- 변환 완료 후 다운로드 버튼 그룹 -->
+            <div id="download-group" class="mt-3 hidden grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button id="download-zip-btn" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-md shadow-emerald-950/40 flex items-center justify-center gap-2 text-xs sm:text-sm">
+                    <i class="fa-solid fa-file-zipper"></i> 전체 ZIP 다운로드
+                </button>
+                <button id="download-all-btn" class="w-full bg-[#291c17] hover:bg-[#38261e] text-stone-200 font-bold py-2.5 px-4 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-md border border-[#4a3329] flex items-center justify-center gap-2 text-xs sm:text-sm">
+                    <i class="fa-solid fa-download"></i> 개별 모두 다운로드
+                </button>
+            </div>
+        </div>
+        
+        <!-- 알림 메시지 박스 -->
+        <div id="message-box" class="mt-3 text-xs font-medium rounded-xl p-3 hidden transition-all"></div>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `
+                    const CACHE_NAME = 'mp3-pro-v1';
+                    self.addEventListener('install', (event) => {
+                        self.skipWaiting();
+                    });
+                    self.addEventListener('activate', (event) => {
+                        event.waitUntil(clients.claim());
+                    });
+                    self.addEventListener('fetch', (event) => {
+                        event.respondWith(
+                            caches.match(event.request).then((response) => {
+                                return response || fetch(event.request).catch(() => {
+                                    return caches.match('./');
+                                });
+                            })
+                        );
+                    });
+                `;
+                const swBlob = new Blob([swCode], { type: 'text/javascript' });
+                const swUrl = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swUrl)
+                    .then(() => console.log('PWA Service Worker registered successfully.'))
+                    .catch((err) => console.log('Service Worker registration failed:', err));
+            });
+        }
+
+        // Dynamically create and inject Web Manifest blob for complete PWA installation support
+        window.addEventListener('DOMContentLoaded', () => {
+            const manifestData = {
+                "name": "MP3 변환기 Pro",
+                "short_name": "MP3변환Pro",
+                "start_url": "./",
+                "display": "standalone",
+                "background_color": "#1a1210",
+                "theme_color": "#1a1210",
+                "icons": [
+                    {
+                        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='28' fill='%231a100c'/%3E%3Ctext x='50' y='43' fill='%23d9b48f' font-weight='900' font-size='26' text-anchor='middle'%3EMP3%3C/text%3E%3C/svg%3E",
+                        "sizes": "192x192 512x512",
+                        "type": "image/svg+xml"
+                    }
+                ]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/manifest+json' });
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            const manifestLink = document.createElement('link');
+            manifestLink.rel = 'manifest';
+            manifestLink.href = manifestUrl;
+            document.head.appendChild(manifestLink);
+        });
+    </script>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileIcon = document.getElementById('file-icon');
+        const fileListContainer = document.getElementById('file-list-container');
+        const fileList = document.getElementById('file-list');
+        const fileCountBadge = document.getElementById('file-count-badge');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+
+        const volumeToggle = document.getElementById('volume-toggle');
+        const targetDbSlider = document.getElementById('target-db-slider');
+        const targetDbText = document.getElementById('target-db-text');
+        const bitrateSelect = document.getElementById('bitrate-select');
+        const clippingWarning = document.getElementById('clipping-warning');
+
+        const convertBtn = document.getElementById('convert-btn');
+        const convertBtnText = document.getElementById('convert-btn-text');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const progressStatus = document.getElementById('progress-status');
+
+        const downloadGroup = document.getElementById('download-group');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+        const downloadAllBtn = document.getElementById('download-all-btn');
+        const messageBox = document.getElementById('message-box');
+
+        function showMessage(msg, type = 'error') {
+            if (!messageBox) return;
+            messageBox.classList.remove('hidden', 'bg-red-950/80', 'text-red-300', 'border-red-800', 'bg-emerald-950/80', 'text-emerald-300', 'border-emerald-800');
+            if (type === 'success') {
+                messageBox.classList.add('bg-emerald-950/80', 'text-emerald-300', 'border', 'border-emerald-800');
+            } else {
+                messageBox.classList.add('bg-red-950/80', 'text-red-300', 'border', 'border-red-800');
+            }
+            messageBox.innerHTML = msg;
+        }
+
+        function hideMessage() {
+            if (!messageBox) return;
+            messageBox.classList.add('hidden');
+            messageBox.innerHTML = '';
+        }
+
+        let filesData = [];
+        let isProcessing = false;
+
+        function ampToDb(amp) {
+            if (!amp || amp <= 0) return -100;
+            return 20 * Math.log10(amp);
+        }
+
+        function formatBytes(bytes, decimals = 1) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function calculateAudioStats(audioBuffer) {
+            const channels = audioBuffer.numberOfChannels;
+            let totalSumSquares = 0;
+            let totalSamples = 0;
+            let maxPeak = 0;
+
+            for (let c = 0; c < channels; c++) {
+                const data = audioBuffer.getChannelData(c);
+                const step = Math.max(1, Math.floor(data.length / 100000));
+                for (let i = 0; i < data.length; i += step) {
+                    const sample = Math.abs(data[i]);
+                    if (sample > maxPeak) maxPeak = sample;
+                    totalSumSquares += sample * sample;
+                    totalSamples++;
+                }
+            }
+            return {
+                rms: Math.sqrt(totalSumSquares / totalSamples),
+                peak: maxPeak
+            };
+        }
+
+        function getEffectiveMultiplierForFile(item) {
+            if (volumeToggle.checked && item.originalRms && item.originalRms > 0) {
+                const targetDb = parseFloat(targetDbSlider.value);
+                const itemDb = ampToDb(item.originalRms);
+                const mult = Math.pow(10, (targetDb - itemDb) / 20);
+                return Math.min(10.0, Math.max(0.1, mult));
+            } else {
+                return 1.0;
+            }
+        }
+
+        targetDbSlider.addEventListener('input', (e) => {
+            if (!volumeToggle.checked) {
+                volumeToggle.checked = true;
+            }
+            const targetDb = parseFloat(e.target.value);
+            targetDbText.textContent = `${targetDb.toFixed(1)} dBFS`;
+            updateClippingStatus();
+            renderFileList();
+        });
+
+        volumeToggle.addEventListener('change', () => {
+            updateClippingStatus();
+            renderFileList();
+        });
+
+        function updateClippingStatus() {
+            if (!volumeToggle.checked) {
+                clippingWarning.classList.add('hidden');
+                return;
+            }
+
+            const clippingFiles = filesData.filter(f => {
+                if (!f.maxPeak) return false;
+                const mult = getEffectiveMultiplierForFile(f);
+                return (f.maxPeak * mult > 1.0);
+            });
+
+            if (clippingFiles.length > 0) {
+                clippingWarning.className = "text-[11px] text-rose-400 font-bold flex items-center gap-1.5";
+                clippingWarning.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-400 animate-pulse"></i> 주의: 설정한 목표 음량(${targetDbSlider.value}dB)에서 <strong>${clippingFiles.length}개 파일</strong>의 소리가 찌그러질 수 있습니다.`;
+                clippingWarning.classList.remove('hidden');
+            } else {
+                clippingWarning.classList.add('hidden');
+            }
+        }
+
+        async function handleFilesSelected(files) {
+            hideMessage();
+            if (!files || files.length === 0) return;
+
+            const validFiles = Array.from(files).filter(file => {
+                const name = file.name.toLowerCase();
+                return name.endsWith('.ogg') || name.endsWith('.opus') || name.endsWith('.m4a') || 
+                       name.endsWith('.wav') || name.endsWith('.aac') || name.endsWith('.flac') ||
+                       name.endsWith('.mp3') || file.type.includes('audio');
+            });
+
+            if (validFiles.length === 0) {
+                showMessage("지원되는 오디오 파일이 없습니다 (.ogg, .opus, .m4a, .wav, .aac 등 지원).");
+                return;
+            }
+
+            for (const file of validFiles) {
+                const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                filesData.push({
+                    id: fileId,
+                    file: file,
+                    audioBuffer: null,
+                    originalRms: 0,
+                    maxPeak: 0,
+                    tags: null,
+                    status: 'analyzing',
+                    progress: 0,
+                    mp3Blob: null,
+                    mp3Url: null,
+                    convertedName: ''
+                });
+            }
+
+            renderFileList();
+            updateUIState();
+
+            for (const item of filesData) {
+                if (item.status === 'analyzing' && !item.audioBuffer) {
+                    await analyzeAudioFile(item);
+                    updateClippingStatus();
+                    renderFileList();
+                    updateUIState();
+                }
+            }
+        }
+
+        async function analyzeAudioFile(item) {
+            try {
+                const tagPromise = new Promise((resolve) => {
+                    if (!window.jsmediatags) return resolve(null);
+                    let resolved = false;
+                    const timer = setTimeout(() => {
+                        if (!resolved) {
+                            resolved = true;
+                            resolve(null);
+                        }
+                    }, 1500);
+
+                    try {
+                        window.jsmediatags.read(item.file, {
+                            onSuccess: (tag) => {
+                                if (!resolved) {
+                                    resolved = true;
+                                    clearTimeout(timer);
+                                    resolve(tag.tags);
+                                }
+                            },
+                            onError: () => {
+                                if (!resolved) {
+                                    resolved = true;
+                                    clearTimeout(timer);
+                                    resolve(null);
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timer);
+                            resolve(null);
+                        }
+                    }
+                });
+
+                const arrayBuffer = await item.file.arrayBuffer();
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                const audioContext = new AudioCtx();
+
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                item.audioBuffer = await new Promise((resolve, reject) => {
+                    audioContext.decodeAudioData(
+                        arrayBuffer,
+                        (decoded) => resolve(decoded),
+                        (err) => reject(err || new Error("디코딩 실패"))
+                    );
+                });
+
+                item.tags = await tagPromise;
+                const stats = calculateAudioStats(item.audioBuffer);
+                item.originalRms = stats.rms;
+                item.maxPeak = stats.peak;
+                item.status = 'ready';
+            } catch (err) {
+                console.error("파일 분석 실패:", item.file.name, err);
+                item.status = 'error';
+            }
+        }
+
+        function renderFileList() {
+            if (filesData.length === 0) {
+                fileListContainer.classList.add('hidden');
+                return;
+            }
+
+            fileListContainer.classList.remove('hidden');
+            fileCountBadge.textContent = `파일 ${filesData.length}개`;
+
+            fileList.innerHTML = filesData.map((item) => {
+                const multiplier = getEffectiveMultiplierForFile(item);
+                const origDb = item.originalRms ? ampToDb(item.originalRms).toFixed(1) : '-';
+                const targetDbVal = parseFloat(targetDbSlider.value).toFixed(1);
+                
+                const estPeakAmp = item.maxPeak ? item.maxPeak * multiplier : 0;
+                const estPeakDbVal = item.maxPeak ? ampToDb(estPeakAmp) : -100;
+                const isClipping = volumeToggle.checked && estPeakAmp > 1.0;
+
+                let statusBadge = '';
+                if (item.status === 'analyzing') {
+                    statusBadge = `<span class="text-[10px] font-semibold text-[#d9b48f] bg-[#3d271d]/80 px-1.5 py-0.5 rounded border border-[#634233]"><i class="fa-solid fa-spinner fa-spin mr-1"></i>분석 중</span>`;
+                } else if (item.status === 'ready') {
+                    if (isClipping) {
+                        const excessDb = (estPeakDbVal > 0 ? '+' + estPeakDbVal.toFixed(1) : '+0.0');
+                        statusBadge = `<span class="text-[10px] font-bold text-rose-400 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-800/60"><i class="fa-solid fa-triangle-exclamation mr-1"></i>클리핑 (${excessDb} dB)</span>`;
+                    } else {
+                        statusBadge = `<span class="text-[10px] font-semibold text-stone-300 bg-[#291c17] px-1.5 py-0.5 rounded border border-[#4a3329]">${volumeToggle.checked ? `조절 대기 (${multiplier.toFixed(2)}x)` : '원본 유지'}</span>`;
+                    }
+                } else if (item.status === 'converting') {
+                    statusBadge = `<span class="text-[10px] font-semibold text-[#d9b48f] bg-[#3d271d]/80 px-1.5 py-0.5 rounded border border-[#634233]"><i class="fa-solid fa-gear fa-spin mr-1"></i>${item.progress}%</span>`;
+                } else if (item.status === 'done') {
+                    statusBadge = `<span class="text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60"><i class="fa-solid fa-check mr-1"></i>완료</span>`;
+                } else if (item.status === 'error') {
+                    statusBadge = `<span class="text-[10px] font-semibold text-rose-400 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-800/60">오류</span>`;
+                }
+
+                const fileUrl = item.mp3Url || (item.file ? URL.createObjectURL(item.file) : '');
+
+                return `
+                    <div class="bg-[#1a110e]/90 rounded-xl p-2.5 border ${isClipping && item.status === 'ready' ? 'border-rose-900/80 bg-rose-950/20' : 'border-[#38261e]'} shadow-sm flex flex-col gap-1.5 transition-all">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-7 h-7 rounded-lg ${item.status === 'done' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60' : (isClipping && item.status === 'ready' ? 'bg-rose-950 text-rose-400 border border-rose-800/60' : 'bg-[#3d271d] text-[#d9b48f] border border-[#634233]')} flex items-center justify-center flex-shrink-0 text-xs">
+                                    <i class="fa-solid ${item.status === 'done' ? 'fa-file-circle-check' : (isClipping && item.status === 'ready' ? 'fa-triangle-exclamation' : 'fa-file-audio')}"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-xs font-bold text-stone-100 truncate" title="${item.file.name}">${item.file.name}</p>
+                                    <p class="text-[10px] text-stone-400 font-medium">
+                                        ${formatBytes(item.file.size)} • 원본: <span class="font-mono text-stone-300">${origDb} dB</span> 
+                                        ${volumeToggle.checked && item.originalRms ? `➔ 목표: <span class="font-mono text-[#d9b48f] font-bold">${targetDbVal} dB</span>` : ''}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
+                                ${statusBadge}
+                                ${item.status === 'done' && item.mp3Url ? `
+                                    <a href="${item.mp3Url}" download="${item.convertedName}" class="text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-2 py-1 rounded-lg transition-colors flex items-center shadow-sm">
+                                        <i class="fa-solid fa-download"></i>
+                                    </a>
+                                ` : ''}
+                                <button onclick="removeFile('${item.id}')" ${isProcessing ? 'disabled' : ''} class="text-stone-500 hover:text-rose-400 text-xs p-1 transition-colors">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        ${fileUrl ? `
+                            <div class="mt-0.5 pt-1.5 border-t border-[#38261e]/80 flex items-center gap-1.5">
+                                <span class="text-[9px] font-bold text-stone-400 flex items-center gap-1"><i class="fa-solid fa-volume-low"></i> ${item.status === 'done' ? '변환본' : '원본'}:</span>
+                                <audio controls src="${fileUrl}" class="w-full h-6 rounded focus:outline-none" style="accent-color: #d9b48f;"></audio>
+                            </div>
+                        ` : ''}
+
+                        ${item.status === 'converting' ? `
+                            <div class="w-full bg-[#120a08] rounded-full h-1 overflow-hidden border border-[#38261e]">
+                                <div class="bg-[#d9b48f] h-full transition-all duration-150" style="width: ${item.progress}%"></div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function removeFile(id) {
+            if (isProcessing) return;
+            const item = filesData.find(f => f.id === id);
+            if (item && item.mp3Url) URL.revokeObjectURL(item.mp3Url);
+            filesData = filesData.filter(f => f.id !== id);
+            updateClippingStatus();
+            renderFileList();
+            updateUIState();
+        }
+
+        clearAllBtn.addEventListener('click', () => {
+            if (isProcessing) return;
+            filesData.forEach(item => { if (item.mp3Url) URL.revokeObjectURL(item.mp3Url); });
+            filesData = [];
+            updateClippingStatus();
+            renderFileList();
+            updateUIState();
+            hideMessage();
+        });
+
+        function updateUIState() {
+            const hasFiles = filesData.length > 0;
+            const allReadyOrDone = filesData.length > 0 && filesData.every(f => f.status === 'ready' || f.status === 'done');
+            const hasDone = filesData.some(f => f.status === 'done');
+
+            if (!hasFiles) {
+                convertBtn.disabled = true;
+                convertBtnText.textContent = '파일을 추가해 주세요';
+                downloadGroup.classList.add('hidden');
+                return;
+            }
+
+            if (hasDone) {
+                downloadGroup.classList.remove('hidden');
+            } else {
+                downloadGroup.classList.add('hidden');
+            }
+
+            if (allReadyOrDone && !isProcessing) {
+                convertBtn.disabled = false;
+                convertBtnText.textContent = `총 ${filesData.length}개 파일 MP3 변환 시작`;
+            } else if (isProcessing) {
+                convertBtn.disabled = true;
+                convertBtnText.textContent = '일괄 변환 진행 중...';
+            } else {
+                convertBtn.disabled = true;
+                convertBtnText.textContent = '파일 분석 대기 중...';
+            }
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-active'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            if (e.dataTransfer.files.length > 0) handleFilesSelected(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFilesSelected(e.target.files);
+        });
+
+        convertBtn.addEventListener('click', async () => {
+            if (filesData.length === 0 || isProcessing) return;
+
+            isProcessing = true;
+            updateUIState();
+            hideMessage();
+
+            volumeToggle.disabled = true;
+            targetDbSlider.disabled = true;
+            bitrateSelect.disabled = true;
+            
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
+
+            const kbps = parseInt(bitrateSelect.value);
+            let completedCount = 0;
+            const totalFiles = filesData.length;
+
+            for (let idx = 0; idx < totalFiles; idx++) {
+                const item = filesData[idx];
+                if (!item.audioBuffer) continue;
+
+                item.status = 'converting';
+                item.progress = 0;
+                renderFileList();
+
+                progressStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-amber-500 mr-1.5"></i>변환 중 (${idx + 1}/${totalFiles}): ${item.file.name}`;
+
+                try {
+                    const audioBuffer = item.audioBuffer;
+                    const channels = audioBuffer.numberOfChannels;
+                    const sampleRate = audioBuffer.sampleRate;
+                    const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, kbps);
+
+                    const leftData = audioBuffer.getChannelData(0);
+                    const rightData = channels > 1 ? audioBuffer.getChannelData(1) : leftData;
+
+                    const sampleBlockSize = 1152;
+                    const mp3Data = [];
+
+                    const itemMultiplier = getEffectiveMultiplierForFile(item);
+
+                    const floatToInt16WithVolume = (f32Array, offset, length, multiplier) => {
+                        const i16Array = new Int16Array(length);
+                        for (let i = 0; i < length; i++) {
+                            let s = f32Array[offset + i] * multiplier;
+                            s = Math.max(-1, Math.min(1, s)); 
+                            i16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                        }
+                        return i16Array;
+                    };
+
+                    const totalSamples = leftData.length;
+
+                    for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+                        const chunkLength = Math.min(sampleBlockSize, totalSamples - i);
+                        
+                        const leftChunk = floatToInt16WithVolume(leftData, i, chunkLength, itemMultiplier);
+                        const rightChunk = floatToInt16WithVolume(rightData, i, chunkLength, itemMultiplier);
+
+                        const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+                        if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+                        if (i % (sampleBlockSize * 150) === 0 || i + sampleBlockSize >= totalSamples) {
+                            const itemPercent = Math.round((i / totalSamples) * 100);
+                            item.progress = itemPercent;
+                            
+                            const overallPercent = Math.round(((idx + (i / totalSamples)) / totalFiles) * 100);
+                            progressBar.style.width = `${overallPercent}%`;
+                            progressText.textContent = `${overallPercent}%`;
+
+                            renderFileList();
+                            await new Promise(resolve => setTimeout(resolve, 0));
+                        }
+                    }
+
+                    const mp3bufFinal = mp3encoder.flush();
+                    if (mp3bufFinal.length > 0) mp3Data.push(mp3bufFinal);
+
+                    const totalLength = mp3Data.reduce((acc, val) => acc + val.length, 0);
+                    const mp3Buffer = new Uint8Array(totalLength);
+                    let offset = 0;
+                    for (let i = 0; i < mp3Data.length; i++) {
+                        mp3Buffer.set(new Uint8Array(mp3Data[i].buffer, mp3Data[i].byteOffset, mp3Data[i].byteLength), offset);
+                        offset += mp3Data[i].byteLength;
+                    }
+
+                    let finalBlob = null;
+                    try {
+                        if (window.browserID3Writer && item.tags) {
+                            const writer = new browserID3Writer(mp3Buffer.buffer);
+                            if (item.tags.title) writer.setFrame('TIT2', item.tags.title);
+                            if (item.tags.artist) writer.setFrame('TPE1', Array.isArray(item.tags.artist) ? item.tags.artist : [item.tags.artist]);
+                            if (item.tags.album) writer.setFrame('TALB', item.tags.album);
+                            if (item.tags.year) writer.setFrame('TYER', item.tags.year.toString());
+                            if (item.tags.picture && item.tags.picture.data) {
+                                writer.setFrame('APIC', {
+                                    type: 3,
+                                    data: new Uint8Array(item.tags.picture.data).buffer,
+                                    description: 'Cover',
+                                });
+                            }
+                            writer.addTag();
+                            finalBlob = writer.getBlob();
+                        } else {
+                            finalBlob = new Blob([mp3Buffer], { type: 'audio/mp3' });
+                        }
+                    } catch (e) {
+                        finalBlob = new Blob([mp3Buffer], { type: 'audio/mp3' });
+                    }
+
+                    if (item.mp3Url) URL.revokeObjectURL(item.mp3Url);
+                    item.mp3Blob = finalBlob;
+                    item.mp3Url = URL.createObjectURL(finalBlob);
+
+                    let newName = item.file.name.replace(/\.[^/.]+$/, "");
+                    if (volumeToggle.checked) {
+                        newName += `_target${targetDbSlider.value}dB`;
+                    }
+                    newName += ".mp3";
+                    item.convertedName = newName;
+
+                    item.status = 'done';
+                    completedCount++;
+                } catch (err) {
+                    console.error("변환 실패:", item.file.name, err);
+                    item.status = 'error';
+                }
+
+                renderFileList();
+            }
+
+            isProcessing = false;
+            volumeToggle.disabled = false;
+            targetDbSlider.disabled = false;
+            bitrateSelect.disabled = false;
+            
+            progressBar.style.width = '100%';
+            progressText.textContent = '100%';
+            progressStatus.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i>모든 파일 변환 완료!`;
+
+            updateUIState();
+            const targetInfo = volumeToggle.checked ? ` (목표 음량 ${targetDbSlider.value} dBFS 적용)` : '';
+            showMessage(`<i class="fa-solid fa-circle-check mr-1.5"></i>총 ${completedCount}개 파일 MP3 변환 성공!${targetInfo}`, "success");
+        });
+
+        downloadZipBtn.addEventListener('click', async () => {
+            const doneFiles = filesData.filter(f => f.status === 'done' && f.mp3Blob);
+            if (doneFiles.length === 0) return;
+
+            if (!window.JSZip) {
+                showMessage("ZIP 라이브러리를 불러오지 못했습니다. 개별 다운로드를 이용해주세요.");
+                return;
+            }
+
+            const zip = new JSZip();
+            doneFiles.forEach(f => {
+                zip.file(f.convertedName, f.mp3Blob);
+            });
+
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const zipUrl = URL.createObjectURL(zipBlob);
+
+            const a = document.createElement('a');
+            a.href = zipUrl;
+            a.download = `MP3_Converted_Batch_${Date.now().toString().slice(-4)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(zipUrl), 2000);
+        });
+
+        downloadAllBtn.addEventListener('click', () => {
+            const doneFiles = filesData.filter(f => f.status === 'done' && f.mp3Url);
+            doneFiles.forEach((f, idx) => {
+                setTimeout(() => {
+                    const a = document.createElement('a');
+                    a.href = f.mp3Url;
+                    a.download = f.convertedName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }, idx * 250);
+            });
+        });
+    </script>
+</body>
+</html>
